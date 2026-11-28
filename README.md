@@ -261,19 +261,72 @@ vendor/codex/         本地Codex运行时与协议资源
 
 ### 环境要求
 
+- Windows 10/11
 - Python 3.12+
-- `uv`
-- Node.js 与 npm/pnpm
+- [`uv`](https://docs.astral.sh/uv/)
+- Node.js 20.9+，推荐 Node.js 22 LTS
+- npm
 - 可选：本地 ComfyUI
 - 可选：已登录或已配置的 Codex CLI
 - 可选：FFmpeg
+
+### 新电脑首次安装
+
+在 PowerShell 中使用 winget 安装基础环境：
+
+```powershell
+winget install --id Git.Git --exact
+winget install --id Python.Python.3.12 --exact
+winget install --id astral-sh.uv --exact
+winget install --id OpenJS.NodeJS.LTS --exact
+winget install --id Gyan.FFmpeg --exact
+```
+
+FFmpeg 只在音频提取、转码、语音合成、字幕和视频处理时需要；仅运行
+ComfyUI 图片/视频生成时可以不安装。
+
+安装完成后重新打开 PowerShell，检查环境：
+
+```powershell
+git --version
+python --version
+uv --version
+node --version
+npm --version
+```
+
+获取项目并安装依赖：
+
+```powershell
+cd C:\Users\你的用户名\PycharmProjects
+git clone -b dev-1122 https://github.com/XieJunchen/MivoAi.git
+cd MivoAi
+
+cd apps\api
+uv sync
+
+cd ..\web
+npm ci
+
+cd ..\..
+```
+
+`uv sync` 会在 `apps/api/.venv` 创建后端虚拟环境，`npm ci` 会根据
+`package-lock.json` 安装前端依赖。
+
+聊天、Agent 和剧本功能需要安装并登录 Codex 桌面应用。项目会自动探测常见
+安装位置；如果无法找到，可以显式配置：
+
+```powershell
+$env:CODEX_BINARY = "C:\完整路径\codex.exe"
+```
 
 ### 一键启动
 
 在仓库根目录运行：
 
-```bash
-uv run python scripts/start_local.py
+```powershell
+python scripts\start_local.py
 ```
 
 启动脚本默认使用 `3000` 与 `8010`。端口被占用时会选择可用端口并同步前端 API 地址。
@@ -288,8 +341,9 @@ Website: http://127.0.0.1:<port>
 
 需要前端热更新：
 
-```bash
-ZAOJING_WEB_MODE=dev uv run python scripts/start_local.py
+```powershell
+$env:ZAOJING_WEB_MODE = "dev"
+python scripts\start_local.py
 ```
 
 按 `Ctrl+C` 可同时停止前后端。
@@ -356,12 +410,55 @@ Invoke-RestMethod http://192.168.1.20:8000/system_stats
 
 ```powershell
 $env:ZAOJING_COMFYUI_URL = "http://192.168.1.20:8000"
-uv run python scripts/start_local.py
+python scripts\start_local.py
 ```
 
 `ZAOJING_COMFYUI_URL` 同时控制工作流发现和生成任务，并优先于数据库中的旧
 ComfyUI 地址。SQLite、资产和工作流数据都保存在电脑 B；电脑 A 只负责
 ComfyUI 计算，其输出目录不作为 MivoAi 的正式数据源。
+
+如果需要让配置在以后打开的新终端中继续生效：
+
+```powershell
+setx ZAOJING_COMFYUI_URL "http://192.168.1.20:8000"
+```
+
+`setx` 不会修改当前终端，执行后需要重新打开 PowerShell。
+
+### 迁移已有数据
+
+替换电脑 B 或复制现有工作环境时，需要一并迁移 MivoAi 的业务数据：
+
+```text
+apps/api/data/conversations.db
+apps/api/data/assets/
+runtime/
+```
+
+`runtime/secrets/master.key` 用于解密已保存的供应商 API Key。只复制数据库
+而不复制该密钥时，已有凭证将无法解密。ComfyUI 模型、自定义节点和模型缓存
+仍由电脑 A 保存，不需要复制到电脑 B。
+
+### 启动检查与常见问题
+
+检查后端健康状态：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8010/health
+```
+
+正常响应包含 `"status": "ok"`。如果启动脚本因为端口占用选择了其他端口，
+请使用终端实际输出的 API 地址。
+
+- `Node.js is not available`：安装 Node.js 后重新打开终端。
+- `No module named uvicorn`：进入 `apps/api` 重新执行 `uv sync`。
+- ComfyUI 连接失败：检查电脑 A 的固定 IPv4、`--listen 0.0.0.0`、防火墙和
+  `ZAOJING_COMFYUI_URL`。
+- 修改 `.env` 没有生效：当前启动流程使用进程环境变量，不会自动读取
+  `.env`。请在启动前设置 PowerShell 环境变量。
+- 页面只能在电脑 B 本机打开：当前启动脚本监听 `127.0.0.1`。若需要从其他
+  电脑访问 MivoAi 页面，还需要调整 API 监听地址、允许主机、Origin 和前端
+  API/WebSocket 地址。
 
 ---
 
