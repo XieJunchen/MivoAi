@@ -8,12 +8,21 @@ import type { MediaTask } from "./types";
 
 type GenerationMode = "image" | "video" | "audio";
 
+type MediaGenerationOptions = {
+  initialMode?: GenerationMode;
+  initialPrompt?: string;
+  fixedModelId?: string;
+};
+
 export function useMediaGeneration(
   models: Model[],
   preferences: Preferences | null = null,
+  options: MediaGenerationOptions = {},
 ) {
-  const [mode, setMode] = useState<GenerationMode>("image");
-  const [prompt, setPrompt] = useState("");
+  const [mode, setMode] = useState<GenerationMode>(
+    options.initialMode ?? "image",
+  );
+  const [prompt, setPrompt] = useState(options.initialPrompt ?? "");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [count, setCount] = useState(1);
   const [task, setTask] = useState<MediaTask | null>(null);
@@ -44,13 +53,19 @@ export function useMediaGeneration(
                   capability,
                 ),
               )
-            : item.capabilities.includes("audio_processing"),
+            : item.capabilities.some((capability) =>
+                ["audio_processing", "transcription"].includes(capability),
+              ),
       ),
     [mode, models],
   );
+  const fixedModel = options.fixedModelId
+    ? models.find((item) => item.id === options.fixedModelId)
+    : undefined;
   const selectedModelId =
-    selectedByMode[mode] ?? availableModels[0]?.id ?? "";
-  const model = availableModels.find((item) => item.id === selectedModelId);
+    options.fixedModelId ?? selectedByMode[mode] ?? availableModels[0]?.id ?? "";
+  const model =
+    fixedModel ?? availableModels.find((item) => item.id === selectedModelId);
   const parameterSchema = model?.parameters ?? [];
   const promptParameter = parameterSchema.find(isPromptParameter);
   const formParameters = useMemo(
@@ -78,6 +93,7 @@ export function useMediaGeneration(
           ? preferences?.defaultVideoModelId
           : undefined;
     if (
+      !options.fixedModelId &&
       availableModels.length &&
       !availableModels.some((item) => item.id === selectedByMode[mode])
     ) {
@@ -90,7 +106,13 @@ export function useMediaGeneration(
             : availableModels[0].id),
       }));
     }
-  }, [availableModels, mode, preferences, selectedByMode]);
+  }, [
+    availableModels,
+    mode,
+    options.fixedModelId,
+    preferences,
+    selectedByMode,
+  ]);
 
   useEffect(() => {
     setParameterValues(
@@ -102,6 +124,13 @@ export function useMediaGeneration(
     );
     setAssetIdsByParameter({});
   }, [model?.id, formParameters]);
+
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+    },
+    [],
+  );
 
   async function generate() {
     if ((promptRequired && !prompt.trim()) || !model || isSubmitting) return;
@@ -128,7 +157,9 @@ export function useMediaGeneration(
               ? model.capabilities.includes("video_processing")
                 ? "video_processing"
                 : "video_generation"
-              : "audio_processing",
+              : model.capabilities.includes("transcription")
+                ? "transcription"
+                : "audio_processing",
         prompt: prompt.trim(),
         inputAssetIds: images,
         images,

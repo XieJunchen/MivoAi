@@ -13,7 +13,7 @@
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 
 **文本创作 · 剧本工作流 · 模型路由 · ComfyUI 生产 · 素材资产 · 长期记忆**
-
+ 
 </div>
 
 ---
@@ -469,6 +469,9 @@ tail -f runtime/logs/codex-protocol.log
 - [`docs/codex-app-server.md`](docs/codex-app-server.md) — Codex App Server 协议集成
 - [`apps/api/README.md`](apps/api/README.md) — API 启动与接口文档
 - [`apps/web/README.md`](apps/web/README.md) — Web 工作台开发说明
+
+git config --local --unset-all http.proxy
+git config --local --unset-all https.proxy
 
 ---
 

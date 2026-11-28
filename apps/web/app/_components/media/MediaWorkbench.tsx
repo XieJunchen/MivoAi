@@ -18,7 +18,10 @@ import NextImage from "next/image";
 import { mediaAssetUrl } from "../../_features/media/api";
 import { useMediaGeneration } from "../../_features/media/useMediaGeneration";
 import { useModelSettings } from "../../_features/models/useModelSettings";
-import type { WorkflowParameter } from "../../_features/workflows/types";
+import {
+  acceptForAssetType,
+  GenerationParameterInput,
+} from "./GenerationParameterInput";
 
 const capabilities = [
   { id: "image", label: "图片", icon: ImageIcon },
@@ -141,7 +144,7 @@ export function MediaWorkbench() {
               {generation.formParameters
                 .filter((parameter) => parameter.type !== "assets")
                 .map((parameter) => (
-                  <WorkflowParameterInput
+                  <GenerationParameterInput
                     key={parameter.key}
                     parameter={parameter}
                     value={generation.parameterValues[parameter.key]}
@@ -335,20 +338,37 @@ export function MediaWorkbench() {
                 </div>
               ) : generation.mode === "audio" ? (
                 <div className="canvas-audio-grid">
-                  {assetIds.map((assetId, index) => (
-                    <article key={assetId}>
-                      <span>
-                        <Music2 size={17} />
-                        {audioTrackLabel(generation.task, assetId, index)}
-                      </span>
-                      <audio
-                        src={mediaAssetUrl(assetId)}
-                        controls
-                        preload="metadata"
-                      />
-                      <code>{assetId.slice(0, 8)}</code>
-                    </article>
-                  ))}
+                  {assetIds.map((assetId, index) =>
+                    generation.task?.taskType === "transcription" ? (
+                      <article key={assetId}>
+                        <span>
+                          <FileText size={17} />
+                          字幕结果 {index + 1}
+                        </span>
+                        <a
+                          href={mediaAssetUrl(assetId)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          查看 / 下载字幕 JSON
+                        </a>
+                        <code>{assetId.slice(0, 8)}</code>
+                      </article>
+                    ) : (
+                      <article key={assetId}>
+                        <span>
+                          <Music2 size={17} />
+                          {audioTrackLabel(generation.task, assetId, index)}
+                        </span>
+                        <audio
+                          src={mediaAssetUrl(assetId)}
+                          controls
+                          preload="metadata"
+                        />
+                        <code>{assetId.slice(0, 8)}</code>
+                      </article>
+                    ),
+                  )}
                 </div>
               ) : (
                 <div
@@ -469,71 +489,6 @@ export function MediaWorkbench() {
   );
 }
 
-type WorkflowParameterInputProps = {
-  parameter: WorkflowParameter;
-  value: unknown;
-  onChange: (value: unknown) => void;
-};
-
-function WorkflowParameterInput({
-  parameter,
-  value,
-  onChange,
-}: WorkflowParameterInputProps) {
-  const options = parameter.options?.map(String);
-  if (parameter.type === "boolean") {
-    return (
-      <label className="workbench-field parameter-checkbox">
-        <span>{parameter.label}</span>
-        <input
-          type="checkbox"
-          checked={Boolean(value)}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-      </label>
-    );
-  }
-  if (options?.length) {
-    return (
-      <label className="workbench-field">
-        <span>{parameter.label}</span>
-        <select
-          value={String(value ?? "")}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </label>
-    );
-  }
-  return (
-    <label className="workbench-field">
-      <span>{parameter.label}</span>
-      <input
-        type={
-          parameter.type === "integer" || parameter.type === "number"
-            ? "number"
-            : "text"
-        }
-        value={String(value ?? "")}
-        min={parameter.min}
-        max={parameter.max}
-        onChange={(event) =>
-          onChange(
-            parameter.type === "integer" || parameter.type === "number"
-              ? Number(event.target.value)
-              : event.target.value,
-          )
-        }
-      />
-    </label>
-  );
-}
-
 function taskStatusLabel(status: string) {
   return (
     {
@@ -577,11 +532,4 @@ function audioTrackLabel(
     labels.find(([stem]) => filename.includes(stem))?.[1] ??
     `音频轨道 ${index + 1}`
   );
-}
-
-function acceptForAssetType(assetType?: string) {
-  if (assetType === "video") return "video/*,.mkv,.mov";
-  if (assetType === "audio") return "audio/*,.m4a,.flac,.ogg";
-  if (assetType === "file") return ".txt,.json,.csv,.pdf,.srt,.ass";
-  return "image/*";
 }

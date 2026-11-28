@@ -1,8 +1,17 @@
 "use client";
 
-import { CheckCircle2, Cpu, Search, Sparkles, Wifi } from "lucide-react";
+import {
+  CheckCircle2,
+  Cpu,
+  FlaskConical,
+  Search,
+  Sparkles,
+  Wifi,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { useModelSettings } from "../../_features/models/useModelSettings";
+import type { Model } from "../../_features/models/types";
+import { ModelTestPanel } from "./ModelTestPanel";
 import { ModelsSectionNav } from "./ModelsSectionNav";
 
 const capabilityLabels: Record<string, string> = {
@@ -30,6 +39,7 @@ export function ModelControlCenter() {
   const settings = useModelSettings();
   const [filter, setFilter] = useState<(typeof filters)[number]["id"]>("all");
   const [search, setSearch] = useState("");
+  const [testingModel, setTestingModel] = useState<Model | null>(null);
 
   const visibleModels = useMemo(
     () =>
@@ -56,8 +66,10 @@ export function ModelControlCenter() {
           );
         }
         if (filter === "audio") {
-          return model.capabilities.some((capability) =>
-            capability.startsWith("audio"),
+          return model.capabilities.some(
+            (capability) =>
+              capability.startsWith("audio") ||
+              capability === "transcription",
           );
         }
         return model.capabilities.includes("text");
@@ -155,6 +167,9 @@ export function ModelControlCenter() {
                   : defaultKind === "video"
                     ? settings.preferences?.defaultVideoModelId === model.id
                     : false;
+            const testable =
+              model.integrationStatus === "ready" &&
+              (model.configured || model.providerId === "codex_local");
             return (
               <article
                 className={`model-card provider-${model.providerId}`}
@@ -203,6 +218,20 @@ export function ModelControlCenter() {
                 </div>
                 <div className="model-card-actions">
                   <button
+                    className="test-button"
+                    type="button"
+                    disabled={!testable}
+                    title={
+                      testable
+                        ? `测试 ${model.name}`
+                        : "请先完成模型配置"
+                    }
+                    onClick={() => setTestingModel(model)}
+                  >
+                    <FlaskConical size={13} />
+                    测试
+                  </button>
+                  <button
                     type="button"
                     disabled={!defaultKind || isDefault}
                     onClick={() => {
@@ -236,6 +265,14 @@ export function ModelControlCenter() {
           </div>
         )}
       </section>
+      {testingModel && (
+        <ModelTestPanel
+          model={testingModel}
+          models={settings.models}
+          preferences={settings.preferences}
+          onClose={() => setTestingModel(null)}
+        />
+      )}
     </main>
   );
 }
